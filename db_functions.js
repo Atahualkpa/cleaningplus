@@ -35,6 +35,7 @@ exports.queryMonthYearHintownDb = function (res, date) {
     var table3 = 'hintown_extrapulito'
     var table4 = 'hintown_extramanca'
     var table5 = 'extra'
+    var name_company = 'Hintown'
 
     db.task(function(t) {
         // creating a sequence of transaction queries:
@@ -70,8 +71,8 @@ exports.queryMonthYearHintownDb = function (res, date) {
             'sum(cmm) as cmmtot, sum(cms) as cmstot, sum(extra) as extratot ' +
             'FROM $1:raw ' +
             'WHERE EXTRACT(month FROM data) = $2 ' +
-            'AND EXTRACT(year FROM data) = $3 ' +
-            'group by(data)', [table5, date.split('/')[0], date.split('/')[1]]);
+            'AND EXTRACT(year FROM data) = $3 and name_company = $4' +
+            'group by(data)', [table5, date.split('/')[0], date.split('/')[1], name_company]);
 
         return t.batch([q1, q2, q3, q4, q5]); // all of the queries are to be resolved;
     })
@@ -98,6 +99,7 @@ exports.queryMonthYearBacciniDb = function (res, date) {
     var table3 = 'baccini_extrapulito'
     var table4 = 'baccini_extramanca'
     var table5 = 'extra'
+    var name_company = 'Baccini'
     db.task(function(t) {
         // creating a sequence of transaction queries:
         var month = date.split('/')[0]
@@ -134,8 +136,8 @@ exports.queryMonthYearBacciniDb = function (res, date) {
             'sum(cmm) as cmmtot, sum(cms) as cmstot, sum(extra) as extratot ' +
             'FROM $1:raw ' +
             'WHERE EXTRACT(month FROM data) = $2 ' +
-            'AND EXTRACT(year FROM data) = $3 ' +
-            'group by(data)', [table5, date.split('/')[0], date.split('/')[1]]);
+            'AND EXTRACT(year FROM data) = $3 and name_company = $4' +
+            'group by(data)', [table5, date.split('/')[0], date.split('/')[1], name_company]);
         return t.batch([q1, q2, q3, q4, q5]); // all of the queries are to be resolved;
     })
         .then(function(data) {
@@ -161,6 +163,7 @@ exports.queryDayMonthYearHintownDb = function (res, date) {
     var table3 = 'hintown_extrapulito'
     var table4 = 'hintown_extramanca'
     var table5 = 'extra'
+    var name_company = 'Hintown'
     var dataCompleta = date.split('-')[2]+'-'+date.split('-')[1]+'-'+date.split('-')[0]
     db.task(function(t) {
         // creating a sequence of transaction queries:
@@ -187,7 +190,7 @@ exports.queryDayMonthYearHintownDb = function (res, date) {
         const q5 = t.any('select lsstar as lsstartot,  lmstar as lmstartot, ' +
             'cmm as cmmtot, cms as cmstot, extra as extratot ' +
             'FROM $1:raw ' +
-            'WHERE data = $2::date ', [table5, new Date(dataCompleta)]);
+            'WHERE data = $2::date and name_company = $3', [table5, new Date(dataCompleta), name_company]);
 
         return t.batch([q1, q2, q3, q4, q5]); // all of the queries are to be resolved;
     })
@@ -213,6 +216,7 @@ exports.queryDayMonthYearBacciniDb = function (res, date) {
     var table3 = 'baccini_extrapulito'
     var table4 = 'baccini_extramanca'
     var table5 = 'extra'
+    var name_company = 'Baccini'
 
     var dataCompleta = date.split('-')[2]+'-'+date.split('-')[1]+'-'+date.split('-')[0]
     db.task(function(t) {
@@ -240,7 +244,7 @@ exports.queryDayMonthYearBacciniDb = function (res, date) {
         const q5 = t.any('select lsstar as clmtot,  lmstar as clstot, ' +
             'cmm as cmmtot, cms as cmstot, extra as extratot ' +
             'FROM $1:raw ' +
-            'WHERE data = $2::date ', [table5, new Date(dataCompleta)]);
+            'WHERE data = $2::date and name_company = $3', [table5, new Date(dataCompleta), name_company]);
         return t.batch([q1, q2, q3, q4, q5]); // all of the queries are to be resolved;
     })
         .then(function(data) {
@@ -316,30 +320,35 @@ exports.queryRegistroMonthYear = function (res, value) {
     var idAgenzia = parseInt(value.idAgenzia)
     var idAppartamento = value.idAppartamento
 
+    console.log('mese', month)
+    console.log('anno', year)
     db.task(function(t) {
         // creating a sequence of transaction queries:
         const q1 = t.one('select prezzo ' +
             'FROM appartamento ' +
             'WHERE agenzia = $1 ' +
             'AND nome = $2', [idAgenzia, idAppartamento]);
-        const q2 = t.one('select ' +
+        const q2 = t.any('select ' +
             'sum(persone) as personeTot, sum(numero) as nvoltemese, ' +
             'sum(extra) as extraTot, sum(extracount) as extraCountTot ' +
             'from registro ' +
             'WHERE EXTRACT(month FROM data) = $1 ' +
             'AND EXTRACT(year FROM data) = $2 and agenzia = $3 and appartamento = $4' +
-            'group by(data)', [month, year, idAgenzia, idAppartamento]);
+            'group by(agenzia, appartamento)', [month, year, idAgenzia, idAppartamento]);
         const q3 = t.one('select nome from agenzia where id = $1', idAgenzia);
         return t.batch([q1, q2, q3]); // all of the queries are to be resolved;
     })
         .then(function(data) {
+            console.log('Guarda1',data[0])
+            console.log('Guarda2',data[1])
+            console.log('Guarda3',data[2])
             var result = {
-                costoTotPersonaMese: data[1].personetot * prezzoOspiti,
-                costoTotAppartamentoMese: data[1].nvoltemese * data[0].prezzo,
-                costoExtraTotMese: data[1].extratot,
-                extraTot : data[1].extracounttot,
+                costoTotPersonaMese: data[1][0].personetot * prezzoOspiti,
+                costoTotAppartamentoMese: data[1][0].nvoltemese * data[0].prezzo,
+                costoExtraTotMese: data[1][0].extratot,
+                extraTot : data[1][0].extracounttot,
                 agenzia : data[2].nome,
-                totpersonemese : data[1].personetot
+                totpersonemese : data[1][0].personetot
             }
             res.send(result)
         })
@@ -516,4 +525,3 @@ var persistsValuesExtra = function(tableName, company, date, info){
         })
 
 }
-
